@@ -1,0 +1,51 @@
+version: "3.9"
+
+volumes:
+  mongo_data:
+
+services:
+
+  ###########################################################################
+  # MongoDB
+  ###########################################################################
+  mongo:
+    image: mongo:7
+    container_name: test-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  ###########################################################################
+  # MERN Backend - Express API (generates diverse logs)
+  ###########################################################################
+  backend:
+    build: ./backend
+    container_name: test-backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/elktest
+      - NODE_ENV=production
+    ports:
+      - "5005:5000"
+    labels:
+      co.elastic.logs/enabled: "true"
+      co.elastic.logs/json.keys_under_root: "true"
+      co.elastic.logs/json.overwrite_keys: "true"
+    depends_on:
+      - mongo
+
+  ###########################################################################
+  # MERN Frontend - React Dashboard
+  ###########################################################################
+  frontend:
+    build: ./frontend
+    container_name: test-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    labels:
+      co.elastic.logs/enabled: "true"
+    depends_on:
+      - backend

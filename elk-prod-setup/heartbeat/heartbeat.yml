@@ -1,4 +1,4 @@
-# Heartbeat - Uptime monitoring (equivalent to Blackbox Exporter)
+# Heartbeat - Uptime monitoring
 
 heartbeat.monitors:
   # HTTP monitoring
@@ -18,15 +18,6 @@ heartbeat.monitors:
       - http://kibana:5601
     check.response.status: [200]
 
-  # Add your application URLs here
-  # - type: http
-  #   id: my-app
-  #   name: My Application
-  #   schedule: '@every 30s'
-  #   urls:
-  #     - https://your-app-url.com
-  #   check.response.status: [200]
-
   # TCP monitoring
   - type: tcp
     id: logstash-tcp
@@ -43,7 +34,7 @@ output.elasticsearch:
 setup.kibana:
   host: "kibana:5601"
 
-setup.dashboards.enabled: true
+setup.dashboards.enabled: false
 
 logging.level: info
 logging.to_files: false

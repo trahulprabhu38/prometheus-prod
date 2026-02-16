@@ -48,7 +48,7 @@ setup.kibana:
   host: "kibana:5601"
 
 # Auto-load dashboards
-setup.dashboards.enabled: true
+setup.dashboards.enabled: false
 
 logging.level: info
 logging.to_files: false
