@@ -40,3 +40,4 @@ loki.write "getting_started" {
 livedebugging {
   enabled = true
 }
+
