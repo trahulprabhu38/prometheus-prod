@@ -49,13 +49,14 @@ services:
   #     - monitoring
 
   grafana:
-    image: grafana/grafana:11.6.0
+    image: grafana/grafana:12.3.2
     container_name: grafana
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin123
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-lokiexplore-app
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -123,7 +124,7 @@ services:
       - monitoring
 
   loki:
-    image: grafana/loki:2.9.4
+    image: grafana/loki:3.5.0
     container_name: loki
     restart: unless-stopped
     volumes:
