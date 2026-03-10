@@ -162,7 +162,7 @@ services:
       - run 
       - --server.http.listen-addr=0.0.0.0:12345
       - --storage.path=/var/lib/alloy/data
-      - /etc/alloy/config.alloyy
+      - /etc/alloy/config.alloy
       
     ports:
       - "12345:12345"
