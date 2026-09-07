@@ -360,7 +360,7 @@ def build(name, cfg):
     ]
     dash = {
         "uid": uid, "title": name,
-        "tags": ["dev", tag.lower().replace(" ", "-"), "valura", "generated"],
+        "tags": ["dev", tag.lower().replace(" ", "-"), "valura"],
         "timezone": "browser", "editable": True, "schemaVersion": 42,
         "graphTooltip": 1, "fiscalYearStartMonth": 0, "weekStart": "", "preload": False,
         "refresh": "30s", "time": {"from": "now-3h", "to": "now"},

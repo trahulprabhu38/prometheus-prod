@@ -5,8 +5,7 @@
     "deployments",
     "coolify",
     "builds",
-    "valura",
-    "generated"
+    "valura"
   ],
   "timezone": "browser",
   "editable": true,

@@ -216,7 +216,7 @@ def build(scope=None):
 
     dash = {
         "uid": uid, "title": uid,
-        "tags": ["deployments", "coolify", "builds", "valura", "generated"] + ([scope] if scope else []),
+        "tags": ["deployments", "coolify", "builds", "valura"] + ([scope] if scope else []),
         "timezone": "browser", "editable": True, "schemaVersion": 42,
         "graphTooltip": 1, "fiscalYearStartMonth": 0, "weekStart": "", "preload": False,
         "refresh": "2m", "time": {"from": "now-24h", "to": "now"},

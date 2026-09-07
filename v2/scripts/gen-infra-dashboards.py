@@ -206,12 +206,12 @@ def build(name, cfg):
 
     links = [
         {"title": "↔ all infra hosts", "type": "dashboards",
-         "tags": ["infra", "generated"], "asDropdown": True, "icon": "external link",
+         "tags": ["infra"], "asDropdown": True, "icon": "external link",
          "includeVars": False, "keepTime": True},
     ]
     dash = {
         "uid": uid, "title": name,
-        "tags": ["infra", "host", "valura", "generated"],
+        "tags": ["infra", "host", "valura"],
         "timezone": "browser", "editable": True, "schemaVersion": 42,
         "graphTooltip": 1, "fiscalYearStartMonth": 0, "weekStart": "", "preload": False,
         "refresh": "30s", "time": {"from": "now-3h", "to": "now"},

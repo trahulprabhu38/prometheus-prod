@@ -4,8 +4,7 @@
   "tags": [
     "infra",
     "host",
-    "valura",
-    "generated"
+    "valura"
   ],
   "timezone": "browser",
   "editable": true,
@@ -28,8 +27,7 @@
       "title": "\u2194 all infra hosts",
       "type": "dashboards",
       "tags": [
-        "infra",
-        "generated"
+        "infra"
       ],
       "asDropdown": true,
       "icon": "external link",
