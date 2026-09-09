@@ -6,8 +6,34 @@ Two independent dimensions, both enforced through Grafana teams:
 2. **Access classification** (what you can *see*): `Prod-View` vs `General-View`,
    enforced via **folder permissions** - not org role.
 
-No SSO yet (deliberately deferred) - accounts are local Grafana users,
-sign-up disabled (`GF_USERS_ALLOW_SIGN_UP=false`), created by an admin.
+## Login: GitHub SSO
+
+Sign-in is **GitHub OAuth**, restricted to the `2CentsCapital` GitHub org.
+Local email/password accounts still work (the `admin` user, plus anyone an
+admin created by hand) but the normal path is "Sign in with GitHub".
+
+Config lives in `grafana/grafana.ini` under `[auth.github]`; the OAuth client
+id/secret come from `.env` (`GITHUB_OAUTH_CLIENT_ID` / `_SECRET`) so they stay
+out of git. The GitHub OAuth app's **Authorization callback URL** must be
+`https://grafana-infra.valura.co.in/login/github` - that host is also set as
+`server.root_url`, which is what Grafana uses to build the redirect.
+
+What SSO does and does *not* do:
+
+- **Does**: authenticate the person, confirm they're in the `2CentsCapital`
+  org (`read:org` scope), and auto-create a Grafana user as **Viewer** on
+  first login (`allow_sign_up = true`, `auto_assign_org_role = Viewer`).
+- **Does not**: grant any dashboard access. A brand-new SSO user is in zero
+  teams and therefore sees zero folders - exactly like a freshly created
+  local user. An admin still runs the onboarding step below to put them in an
+  access team (`Prod-View` / `General-View`) + a project team.
+
+GitHub org/team -> Grafana role or team mapping (`role_attribute_path`,
+`team_ids`) is deliberately not wired up - team membership stays a manual,
+reviewed decision.
+
+To revoke someone: remove them from the `2CentsCapital` GitHub org (blocks
+new logins) and disable/delete the Grafana user (kills existing sessions).
 
 ## Folders
 

@@ -196,11 +196,14 @@ services:
     container_name: grafana
     restart: unless-stopped
     # .env is loaded so the provisioned datasources can interpolate
-    # ${CF_API_TOKEN} (Infinity) and ${AWS_*} (opt-in CloudWatch datasource).
+    # ${CF_API_TOKEN} (Infinity) and ${AWS_*} (opt-in CloudWatch datasource),
+    # and so grafana.ini can pull ${GITHUB_OAUTH_CLIENT_ID/SECRET} for GitHub SSO.
     env_file: [.env]
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Local email/password sign-up form only. GitHub SSO sign-up is a
+      # separate switch, set in grafana/grafana.ini ([auth.github]).
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_FEATURE_TOGGLES_ENABLE=traceToMetrics
       - GF_RENDERING_SERVER_URL=http://renderer:8081/render
@@ -211,6 +214,10 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      # Config overrides (root_url, GitHub SSO). Single-file bind mount: after
+      # editing it, `docker compose restart grafana` - a live reload won't pick
+      # it up (see docs/08, the inode gotcha).
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
     ports:
       - "3000:3000"
     networks: [monitoring]

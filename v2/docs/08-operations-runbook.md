@@ -24,6 +24,8 @@ make ecs-up        # up + the ECS/CloudWatch exporter profile
 | `otel-collector/config.yaml` | `make validate && docker compose restart otel-collector` | yes |
 | `alertmanager/alertmanager.yml` | `docker kill -s HUP alertmanager` (or `restart`) | no (HUP) |
 | `grafana/provisioning/*` | `docker compose restart grafana` | yes |
+| `grafana/grafana.ini` (root_url, GitHub SSO) | `docker compose restart grafana` | yes (single-file bind mount - see the inode gotcha below) |
+| `.env` (`GITHUB_OAUTH_*`, `GRAFANA_ADMIN_*`, `CF_*`, `AWS_*`) | `make up` (recreates changed) | grafana only |
 | `docker-compose.yml` (image tags, ports, flags) | `make up` (recreates changed) | changed only |
 
 Always `make validate` before reloading Prometheus / Alertmanager / the
