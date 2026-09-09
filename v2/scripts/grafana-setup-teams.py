@@ -58,22 +58,24 @@ print("folders:", folder_uid)
 # Prod-View    -> non-prod: View  AND production: View   (superset)
 def _keep(existing, *, drop_team=None, drop_role=None):
     """Rebuild the permissions list, preserving every grant except the one
-    we're about to re-add. The API wants bare userId/teamId/builtInRole +
-    permission entries; the GET returns those plus inherited/decorated fields
-    we must strip."""
+    we're about to re-add. This legacy folder-ACL endpoint wants bare
+    userId / teamId / role (+ permission) items; the GET decorates each with
+    inherited/name/avatar fields we must strip. A built-in-role grant comes
+    back keyed `role` ("Viewer"/"Editor") - NOT `builtInRole`, which is the
+    RBAC endpoint's spelling and 500s here."""
     out = []
     for p in existing:
         if drop_team is not None and p.get("teamId") == drop_team:
             continue
-        if drop_role is not None and p.get("builtInRole") == drop_role \
+        if drop_role is not None and p.get("role") == drop_role \
            and not p.get("teamId") and not p.get("userId"):
             continue
         if p.get("teamId"):
             out.append({"teamId": p["teamId"], "permission": p["permission"]})
         elif p.get("userId"):
             out.append({"userId": p["userId"], "permission": p["permission"]})
-        elif p.get("builtInRole"):
-            out.append({"builtInRole": p["builtInRole"], "permission": p["permission"]})
+        elif p.get("role"):
+            out.append({"role": p["role"], "permission": p["permission"]})
     return out
 
 def set_perm(folder_title, team_name, permission):
@@ -85,15 +87,16 @@ def set_perm(folder_title, team_name, permission):
     res = call("POST", f"/api/folders/{uid}/permissions", {"items": new_items})
     print(f"  {folder_title} + {team_name} (perm={permission}):", res if "__error__" in res else "ok")
 
-def set_role_perm(folder_title, built_in_role, permission):
+def set_role_perm(folder_title, role, permission):
     """Grant a Grafana built-in role (Viewer/Editor) View on a folder, without
-    disturbing the team grants already on it."""
+    disturbing the team grants already on it. `role` goes in the payload as
+    {"role": "Viewer", ...} - see _keep for why not "builtInRole"."""
     uid = folder_uid[folder_title]
     existing = call("GET", f"/api/folders/{uid}/permissions")
-    new_items = _keep(existing, drop_role=built_in_role)
-    new_items.append({"builtInRole": built_in_role, "permission": permission})
+    new_items = _keep(existing, drop_role=role)
+    new_items.append({"role": role, "permission": permission})
     res = call("POST", f"/api/folders/{uid}/permissions", {"items": new_items})
-    print(f"  {folder_title} + role:{built_in_role} (perm={permission}):", res if "__error__" in res else "ok")
+    print(f"  {folder_title} + role:{role} (perm={permission}):", res if "__error__" in res else "ok")
 
 set_perm("non-prod", "General-View", 1)   # 1 = View
 set_perm("non-prod", "Prod-View", 1)
