@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # One-time setup: creates the 5 RBAC teams (UAE/IND/Partner-Apps project
 # teams + Prod-View/General-View access teams) and grants their folder
-# permissions (non-prod/dev/staging <- General-View+Prod-View,
-# prod/deployments <- Prod-View only).
+# permissions:
+#   non-prod/dev/staging <- Viewer role (every authenticated user) + both
+#                           access teams
+#   prod/deployments     <- Prod-View only
+# The Viewer-role grant is what lets a fresh GitHub SSO login see
+# dev/staging/non-prod immediately, with no team assignment.
 # Idempotent - safe to re-run, looks up existing teams instead of erroring.
 # See docs/10-rbac-teams-access.md for the full RBAC model.
 import json, os, sys, urllib.request, base64
@@ -52,25 +56,44 @@ print("folders:", folder_uid)
 # 4. Folder permissions
 # General-View -> non-prod: View
 # Prod-View    -> non-prod: View  AND production: View   (superset)
+def _keep(existing, *, drop_team=None, drop_role=None):
+    """Rebuild the permissions list, preserving every grant except the one
+    we're about to re-add. The API wants bare userId/teamId/builtInRole +
+    permission entries; the GET returns those plus inherited/decorated fields
+    we must strip."""
+    out = []
+    for p in existing:
+        if drop_team is not None and p.get("teamId") == drop_team:
+            continue
+        if drop_role is not None and p.get("builtInRole") == drop_role \
+           and not p.get("teamId") and not p.get("userId"):
+            continue
+        if p.get("teamId"):
+            out.append({"teamId": p["teamId"], "permission": p["permission"]})
+        elif p.get("userId"):
+            out.append({"userId": p["userId"], "permission": p["permission"]})
+        elif p.get("builtInRole"):
+            out.append({"builtInRole": p["builtInRole"], "permission": p["permission"]})
+    return out
+
 def set_perm(folder_title, team_name, permission):
     uid = folder_uid[folder_title]
     tid = team_ids[team_name]
     existing = call("GET", f"/api/folders/{uid}/permissions")
-    items = [p for p in existing if p.get("teamId") or p.get("role") == "Admin" and p.get("userId") is None]
-    # keep existing non-team basic/inherited entries, drop old grant for this team if present, add new
-    new_items = []
-    for p in existing:
-        if p.get("teamId") == tid:
-            continue
-        # keep entries that aren't editable "inherited" markers oddly shaped; the API wants userId/teamId/builtInRole + permission
-        entry = {}
-        if p.get("teamId"): entry = {"teamId": p["teamId"], "permission": p["permission"]}
-        elif p.get("userId"): entry = {"userId": p["userId"], "permission": p["permission"]}
-        elif p.get("builtInRole"): entry = {"builtInRole": p["builtInRole"], "permission": p["permission"]}
-        if entry: new_items.append(entry)
+    new_items = _keep(existing, drop_team=tid)
     new_items.append({"teamId": tid, "permission": permission})
     res = call("POST", f"/api/folders/{uid}/permissions", {"items": new_items})
     print(f"  {folder_title} + {team_name} (perm={permission}):", res if "__error__" in res else "ok")
+
+def set_role_perm(folder_title, built_in_role, permission):
+    """Grant a Grafana built-in role (Viewer/Editor) View on a folder, without
+    disturbing the team grants already on it."""
+    uid = folder_uid[folder_title]
+    existing = call("GET", f"/api/folders/{uid}/permissions")
+    new_items = _keep(existing, drop_role=built_in_role)
+    new_items.append({"builtInRole": built_in_role, "permission": permission})
+    res = call("POST", f"/api/folders/{uid}/permissions", {"items": new_items})
+    print(f"  {folder_title} + role:{built_in_role} (perm={permission}):", res if "__error__" in res else "ok")
 
 set_perm("non-prod", "General-View", 1)   # 1 = View
 set_perm("non-prod", "Prod-View", 1)
@@ -86,6 +109,18 @@ set_perm("deployments", "Prod-View", 1)   # the GLOBAL cross-client dashboards (
                                            # The per-env deployments-{dev,staging,prod}
                                            # dashboards live in dev/staging/prod above and
                                            # inherit those folders' permissions instead.
+
+# Auto-access for every authenticated user. GitHub SSO logins auto-assign as
+# org role Viewer (grafana.ini: auth.github.allow_sign_up + users.auto_assign_org_role),
+# so granting the Viewer *role* View on these three folders means a new person
+# sees dev/staging/non-prod on their very first login - no team assignment,
+# no admin step. Login is already hard-restricted to the 2CentsCapital GitHub
+# org, so "any Viewer" == "any org member" == exactly the General-View
+# audience. prod and deployments get NO role grant on purpose - they stay
+# Prod-View-team-only, which is still the one thing an admin grants by hand.
+set_role_perm("non-prod", "Viewer", 1)
+set_role_perm("dev", "Viewer", 1)
+set_role_perm("staging", "Viewer", 1)
 
 # 5. Safety sweep: dashboard-level permissions can carry direct, non-inherited
 # role-based grants (e.g. {"role":"Viewer","permission":1}) that bypass folder

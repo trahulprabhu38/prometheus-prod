@@ -18,19 +18,30 @@ out of git. The GitHub OAuth app's **Authorization callback URL** must be
 `https://grafana-infra.valura.co.in/login/github` - that host is also set as
 `server.root_url`, which is what Grafana uses to build the redirect.
 
-What SSO does and does *not* do:
+What SSO does:
 
-- **Does**: authenticate the person, confirm they're in the `2CentsCapital`
-  org (`read:org` scope), and auto-create a Grafana user as **Viewer** on
-  first login (`allow_sign_up = true`, `auto_assign_org_role = Viewer`).
-- **Does not**: grant any dashboard access. A brand-new SSO user is in zero
-  teams and therefore sees zero folders - exactly like a freshly created
-  local user. An admin still runs the onboarding step below to put them in an
-  access team (`Prod-View` / `General-View`) + a project team.
+- Authenticates the person and confirms they're in the `2CentsCapital` org
+  (`read:org` scope).
+- Auto-creates a Grafana user as **Viewer** on first login
+  (`allow_sign_up = true`, `auto_assign_org_role = Viewer`).
+- Because the `Viewer` role is granted View on `dev`, `staging` and
+  `non-prod` (see *Folder permissions* below), the new person **can see
+  those three folders immediately** - no team assignment, no admin step.
 
-GitHub org/team -> Grafana role or team mapping (`role_attribute_path`,
-`team_ids`) is deliberately not wired up - team membership stays a manual,
-reviewed decision.
+What SSO does *not* do:
+
+- Grant `prod` or the global `deployments` folder. Those stay
+  `Prod-View`-team-only. An admin adds someone to `Prod-View` (and usually a
+  project team) via the onboarding step below when they need prod.
+- Map GitHub org/team -> Grafana role or team (`role_attribute_path`,
+  `team_ids`). Not wired up - Enterprise-only for OAuth anyway, and
+  `Prod-View` membership stays a manual, reviewed decision.
+
+This is a deliberate softening of the old "zero teams = zero dashboards"
+rule: now that login is hard-restricted to one GitHub org, "any authenticated
+Viewer" and "the General-View audience" are the same set of people, so
+dev/staging/non-prod visibility is just the Viewer-role default. `prod` is
+the only tier that still gates on team membership.
 
 To revoke someone: remove them from the `2CentsCapital` GitHub org (blocks
 new logins) and disable/delete the Grafana user (kills existing sessions).
@@ -43,10 +54,10 @@ access" possible.
 
 | Folder | Contains | Who sees it |
 |---|---|---|
-| `dev` | dev-UAE, dev-IND, infra-dev, deployments-dev, deployment-builds-dev | General-View + Prod-View |
-| `staging` | stg-UAE, stg-IND, infra-stg-uae, infra-stg-ind, deployments-staging, deployment-builds-staging | General-View + Prod-View |
+| `dev` | dev-UAE, dev-IND, infra-dev, deployments-dev, deployment-builds-dev | any logged-in user (Viewer role) |
+| `staging` | stg-UAE, stg-IND, infra-stg-uae, infra-stg-ind, deployments-staging, deployment-builds-staging | any logged-in user (Viewer role) |
 | `prod` | prod-UAE, infra-prod-uae, deployments-prod, deployment-builds-prod | Prod-View only |
-| `non-prod` | partner-apps, infra-partner-apps, infra-observability, stack-health, and the imported AWS/Cloudflare/general dashboards | General-View + Prod-View |
+| `non-prod` | partner-apps, infra-partner-apps, infra-observability, stack-health, and the imported AWS/Cloudflare/general dashboards | any logged-in user (Viewer role) |
 | `deployments` | the GLOBAL deployments/deployment-builds pair - all 181 apps across every client project on the Coolify instance, not just ours | Prod-View only |
 
 `partner-apps` and `infra-observability` deliberately stay in `non-prod`
@@ -77,29 +88,54 @@ for the default/root folder and refuses to create another one with that name.)
 | `UAE` | project | leads + devs on the UAE product |
 | `IND` | project | leads + devs on the IND product |
 | `Partner-Apps` | project | leads + devs on partner-apps |
-| `Prod-View` | access | anyone who should see `prod` and `deployments` (also sees `dev`/`staging`/`non-prod` - superset) |
-| `General-View` | access | anyone who should see `dev`/`staging`/`non-prod` but not `prod` or the global `deployments` folder |
+| `Prod-View` | access | anyone who should see `prod` and the global `deployments` folder (they see `dev`/`staging`/`non-prod` too, like everyone) |
+| `General-View` | access | legacy - `dev`/`staging`/`non-prod` is now the Viewer-role default for every logged-in user, so this team grants nothing extra. Kept as a grouping label; safe to stop using. |
 
 Project teams carry **no folder permissions of their own** - they're purely
-organisational (who's on which squad). All dashboard visibility comes from
-whichever access-classification team someone is also a member of. A person is
-normally in exactly one project team + exactly one access team.
+organisational (who's on which squad). The only access decision that still
+matters is **`Prod-View` or not**: it's the sole gate on `prod` and the
+global `deployments` folder. Everything else every authenticated user sees by
+default.
 
 ## Folder permissions (View only - nobody edits provisioned dashboards)
 
 ```
-non-prod     <- General-View (View), Prod-View (View)
-dev          <- General-View (View), Prod-View (View)
-staging      <- General-View (View), Prod-View (View)
+non-prod     <- Viewer role (View), General-View (View), Prod-View (View)
+dev          <- Viewer role (View), General-View (View), Prod-View (View)
+staging      <- Viewer role (View), General-View (View), Prod-View (View)
 prod         <- Prod-View (View)
 deployments  <- Prod-View (View)
 ```
 
-Verified to carry *only* these team grants - no blanket Viewer/Editor
-built-in-role access, so someone in zero teams sees zero dashboards regardless
-of org role.
+The `Viewer` **role** grant on `dev`/`staging`/`non-prod` is what makes a
+fresh GitHub SSO login (auto-assigned org role Viewer) see those folders on
+first login with no team step. The `General-View`/`Prod-View` team grants on
+those same three folders are now redundant but left in place - harmless, and
+they keep the script's output diff-free if you re-run it.
+
+`prod` and `deployments` carry **only** the `Prod-View` team grant - no
+Viewer/Editor role access - so a user who isn't in `Prod-View` still can't
+see them, exactly as before. `grafana-setup-teams.py` sets all of this
+(`set_perm` for the team grants, `set_role_perm` for the Viewer-role grants)
+and is idempotent.
 
 ## Onboarding someone
+
+**With GitHub SSO, most people need no onboarding at all**: they click "Sign
+in with GitHub", get an auto-created Viewer account, and immediately see
+`dev`/`staging`/`non-prod`. The only manual steps, and only when they apply:
+
+- **Needs prod access** -> add them to `Prod-View`:
+  `POST /api/teams/<Prod-View id>/members {"userId": <id>}`, or
+  **Administration -> Teams** in the UI.
+- **Is a team lead** (should be able to edit, not just view) -> bump org role:
+  `PATCH /api/org/users/<id> {"role":"Editor"}`.
+- **Project team** (`UAE`/`IND`/`Partner-Apps`) -> optional, organisational
+  only; add via the UI if you want the squad grouping.
+
+The script below is for **local (non-GitHub) accounts** - a break-glass
+admin, a contractor outside the org, CI. It still creates the account, sets
+the org role, and adds project + access teams:
 
 ```bash
 ./scripts/grafana-add-user.sh <email> "<full name>" '<temp password>' <team> <lead|dev> <prod|general>
@@ -176,10 +212,10 @@ for the password alone - then update `GRAFANA_ADMIN_PASSWORD` in `.env` to
 match (that env var only seeds a *fresh* install; it does not reset an
 existing account on restart).
 
-## Next: SSO
+## SSO
 
-Deferred by request. When ready, GitHub OAuth is half-wired conceptually -
-see the session notes for what's needed (an OAuth App, callback URL
-`https://grafana-infra.valura.co.in/login/github`, and a decision on whether
-to gate login to a specific GitHub org). SSO would replace local-account
-creation but the team/folder structure above stays exactly the same.
+Done - GitHub OAuth, gated to the `2CentsCapital` org. See *Login: GitHub
+SSO* near the top. The team/folder structure is unchanged; the only RBAC
+change SSO brought is that `dev`/`staging`/`non-prod` are now the Viewer-role
+default (so new users land with useful access) instead of requiring a
+`General-View` team assignment.
